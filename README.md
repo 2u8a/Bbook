@@ -1,32 +1,78 @@
-# React + TypeScript + Vite
+﻿# Bbook
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+ローカルのPDFを本みたいに快適に読むWebアプリ。見開きPDFの分割対応と、右→左/左→右の読み方向を自由に切り替えられる。
 
-Currently, two official plugins are available:
+## 何ができるの？
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **PDFアップロード** — ドラッグ&ドロップかタップで追加。サーバーに送らず、ブラウザに保存
+- **見開き自動検出** — A3やB4横のPDFを自動で見つけて、1ページずつ表示するように分割
+- **読み方向の設定** — 左→右（洋書）と右→左（日本語マンガ・書籍）をワンタップで切り替え
+- **しおり機能** — 止めたとこから自動で再開。離脱しても続きから読める
+- **シンプルUI** — モバイルファーストで、読むことに集中できる
 
-## React Compiler
+## 使い方
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 起動
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+ブラウザで表示されたURLにアクセス。
+
+### 本の追加
+
+本棚画面で「PDFを追加」をタップ。ファイル選択するか、PDFをドラッグ&ドロップ。
+
+### 読むとき
+
+本をタップして開く。
+
+**操作**
+- **左・右エッジをタップ** — ページ送り（向きに応じて逆になる）
+- **中央をタップ** — UIの表示/非表示
+- **スワイプ** — ページ送り
+- **右上の設定ボタン** — ページ送り向きと見開き分割の設定を変更
+
+### よくある設定
+
+| 用途 | 設定 |
+|------|------|
+| 洋書、技術書 | ページ送り：左→右、分割：分割しない |
+| 見開きマンガ | ページ送り：右→左、分割：右ページから |
+| 日本語の見開き書籍 | ページ送り：右→左、分割：左ページから |
+
+## 技術
+
+- **React 18** + **TypeScript**
+- **Vite** — 高速ビルド
+- **pdf.js** — PDFレンダリング
+- **IndexedDB** — ブラウザにPDF保存
+- **Tailwind CSS** — スタイリング
+
+## 対応環境
+
+- Chrome/Edge/Firefox/Safari（最新版）
+- モバイル・デスクトップ両対応
+- ネットワーク不要（ローカル保存だけで動く）
+
+## 制限事項
+
+- PDFはブラウザのIndexedDBに保存。ブラウザのデータ削除でPDFも消える
+- テキスト認識・OCRは未対応（画像としてレンダリング）
+
+## 今後追加したい機能
+
+- ハイライト・メモ機能
+- クラウド同期
+- 検索機能
+- ダークモード設定の永続化
+
+## ライセンス
+
+MIT
+
+---
+
+何か質問あったら聞いてね。
