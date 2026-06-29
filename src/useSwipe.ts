@@ -7,6 +7,7 @@ export function useSwipe(
   onNext: () => void,
   onPrev: () => void,
   direction: ReadingDirection,
+  onTap?: (clientX: number) => void,
 ) {
   const startX = useRef(0)
   const startY = useRef(0)
@@ -28,10 +29,16 @@ export function useSwipe(
     function onPointerUp(e: PointerEvent) {
       const dx = e.clientX - startX.current
       const dy = e.clientY - startY.current
-      // 横移動が10px以上、かつ縦より横が大きければスワイプ判定
-      if (Math.abs(dx) < 10 || Math.abs(dy) > Math.abs(dx)) return
-      if (!moved.current) return
 
+      // タップ判定: 移動が少ない or 縦移動が大きい
+      if (!moved.current || Math.abs(dx) < 10 || Math.abs(dy) > Math.abs(dx)) {
+        onTap?.(e.clientX)
+        return
+      }
+
+      // スワイプ判定
+      // LTR: 左スワイプ(dx<0)=次へ、右スワイプ(dx>0)=前へ
+      // RTL: 右スワイプ(dx>0)=次へ（右→左の本は右フリックで前進）、左スワイプ(dx<0)=前へ
       if (direction === 'ltr') {
         if (dx < 0) onNext(); else onPrev()
       } else {
@@ -47,5 +54,5 @@ export function useSwipe(
       el.removeEventListener('pointermove', onPointerMove)
       el.removeEventListener('pointerup', onPointerUp)
     }
-  }, [el, onNext, onPrev, direction])
+  }, [el, onNext, onPrev, direction, onTap])
 }

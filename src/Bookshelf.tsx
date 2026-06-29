@@ -94,7 +94,9 @@ function EditModal({ book, onSave, onClose }: EditModalProps) {
 
 function BookCover({ book }: { book: BookRecord }) {
   const color = book.color ?? '#2c3e50'
-  const initials = book.title.slice(0, 2)
+  const label = book.title.length > 10 ? book.title.slice(0, 10) + '…' : book.title
+  // 4文字以下は大きく、以降は文字数に応じてシームレスに縮小
+  const fontSize = label.length <= 4 ? 22 : Math.max(12, Math.round(88 / label.length))
 
   return (
     <div
@@ -105,8 +107,11 @@ function BookCover({ book }: { book: BookRecord }) {
       <div className="absolute top-0 left-3 right-3 h-1 bg-white/20 rounded-b-full" />
       <div className="absolute left-0 top-0 bottom-0 w-3 bg-black/20" />
 
-      <div className="flex-1 flex items-center justify-center">
-        <span className="text-white/80 text-3xl font-bold select-none">{initials}</span>
+      <div className="flex-1 flex items-center justify-center px-1">
+        <span
+          className="text-white/90 font-bold select-none text-center leading-snug break-all"
+          style={{ fontSize }}
+        >{label}</span>
       </div>
 
       {/* 進捗バー */}

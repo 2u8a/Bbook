@@ -104,24 +104,23 @@ export default function Reader() {
     uiTimerRef.current = setTimeout(() => setShowUI(false), 3000)
   }
 
-  function handleTap(e: React.MouseEvent) {
-    // スワイプ後のクリックイベントは無視
-    if ((e.nativeEvent as PointerEvent & { _fromSwipe?: boolean })._fromSwipe) return
-
-    const x = e.clientX
+  // タップ処理（useSwipeから呼ばれる）
+  const handleTap = useCallback((clientX: number) => {
     const w = window.innerWidth
-    if (x < w * 0.4) {
+    if (clientX < w * 0.4) {
       // 左40%タップ
+      // LTR: 左=前のページ / RTL: 左=次のページ（右綴じ本の進行方向）
       if (direction === 'ltr') goPrev(); else goNext()
-    } else if (x > w * 0.6) {
+    } else if (clientX > w * 0.6) {
       // 右40%タップ
+      // LTR: 右=次のページ / RTL: 右=前のページ
       if (direction === 'ltr') goNext(); else goPrev()
     } else {
-      // 中央20%タップ: UI表示/非表示
+      // 中央20%: UI表示/非表示
       setShowUI(v => !v)
       if (uiTimerRef.current) clearTimeout(uiTimerRef.current)
     }
-  }
+  }, [direction, goNext, goPrev])
 
   function handleSettingsChange(dir: ReadingDirection, mode: SplitMode) {
     setDirection(dir)
@@ -129,15 +128,28 @@ export default function Reader() {
     saveSettings({ direction: dir, splitMode: mode })
   }
 
-  useSwipe(containerRef.current, goNext, goPrev, direction)
+  function handleSeek(e: React.ChangeEvent<HTMLInputElement>) {
+    // RTLのとき input は scaleX(-1) されているので値を反転する
+    const raw = Number(e.target.value)
+    const idx = direction === 'rtl' ? (totalVirtual - 1 - raw) : raw
+    setCurrentIndex(idx)
+    flashUI()
+  }
+
+  // useSwipe に onTap を渡してクリックイベントの二重発火を防ぐ
+  useSwipe(containerRef.current, goNext, goPrev, direction, handleTap)
 
   const progress = totalVirtual > 1 ? (currentIndex / (totalVirtual - 1)) * 100 : 0
+  const progressPct = Math.round(progress)
+
+  // シークバーの表示値: RTLは反転
+  const sliderValue = direction === 'rtl' ? (totalVirtual - 1 - currentIndex) : currentIndex
+  const sliderMax = Math.max(0, totalVirtual - 1)
 
   return (
     <div
       ref={containerRef}
       className="w-full h-dvh bg-black flex flex-col items-center justify-center overflow-hidden select-none"
-      onClick={handleTap}
     >
       {/* Canvas */}
       <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
@@ -157,23 +169,47 @@ export default function Reader() {
         <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent px-4 pt-10 pb-8 flex items-center gap-3 pointer-events-auto">
           <button
             className="text-white text-sm px-3 py-1 rounded-full bg-white/10"
-            onClick={e => { e.stopPropagation(); navigate('/') }}
+            onClick={() => navigate('/')}
           >← 本棚</button>
           <p className="text-white text-sm flex-1 truncate">{title}</p>
           <button
             className="text-white text-sm px-3 py-1 rounded-full bg-white/10"
-            onClick={e => { e.stopPropagation(); setShowSettings(v => !v) }}
+            onClick={() => setShowSettings(v => !v)}
           >設定</button>
         </div>
 
-        {/* タップヒント（左右端） */}
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[40%] h-[60%] flex items-center justify-start pl-3 opacity-0" />
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[40%] h-[60%] flex items-center justify-end pr-3 opacity-0" />
-
         {/* フッター */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-8 pt-8">
-          <div className="h-1 bg-white/20 rounded-full overflow-hidden mb-2">
-            <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${progress}%` }} />
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-8 pt-10 pointer-events-auto">
+          {/* ページ数・進捗% */}
+          <div className="flex justify-between items-center mb-2 text-xs text-white/60">
+            {direction === 'ltr' ? (
+              <>
+                <span>{currentIndex + 1} / {totalVirtual}</span>
+                <span>{progressPct}%</span>
+              </>
+            ) : (
+              <>
+                <span>{progressPct}%</span>
+                <span>{currentIndex + 1} / {totalVirtual}</span>
+              </>
+            )}
+          </div>
+
+          {/* シークスライダー（RTLは見た目を反転） */}
+          <div
+            style={{ transform: direction === 'rtl' ? 'scaleX(-1)' : 'none' }}
+          >
+            <input
+              type="range"
+              min={0}
+              max={sliderMax}
+              value={sliderValue}
+              onChange={handleSeek}
+              className="w-full cursor-pointer appearance-none h-1 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-400 [&::-webkit-slider-thumb]:cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #f59e0b ${progressPct}%, rgba(255,255,255,0.2) ${progressPct}%)`,
+              }}
+            />
           </div>
         </div>
       </div>
@@ -182,7 +218,7 @@ export default function Reader() {
       {showSettings && (
         <div
           className="absolute inset-0 bg-black/60 flex items-end pointer-events-auto"
-          onClick={e => { e.stopPropagation(); setShowSettings(false) }}
+          onClick={() => setShowSettings(false)}
         >
           <div
             className="w-full bg-stone-900 rounded-t-2xl p-6 flex flex-col gap-5"
