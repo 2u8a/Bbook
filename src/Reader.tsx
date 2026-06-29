@@ -42,8 +42,10 @@ export default function Reader() {
   const containerRef = useRef<HTMLDivElement>(null)
   const uiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const renderingRef = useRef(false)
+  const totalVirtualRef = useRef(0)
 
   const { ready, totalVirtual, renderPage } = usePdf(pdfData, splitMode, spreadDetected)
+  totalVirtualRef.current = totalVirtual
 
   // 本を読み込む
   useEffect(() => {
@@ -74,14 +76,27 @@ export default function Reader() {
   }, [id, currentIndex, ready])
 
   const goNext = useCallback(() => {
-    setCurrentIndex(i => Math.min(i + 1, totalVirtual - 1))
+    setCurrentIndex(i => Math.min(i + 1, totalVirtualRef.current - 1))
     flashUI()
-  }, [totalVirtual])
+  }, [])
 
   const goPrev = useCallback(() => {
     setCurrentIndex(i => Math.max(i - 1, 0))
     flashUI()
   }, [])
+
+  // キーボード操作
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight') {
+        direction === 'ltr' ? goNext() : goPrev()
+      } else if (e.key === 'ArrowLeft') {
+        direction === 'ltr' ? goPrev() : goNext()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [direction, goNext, goPrev])
 
   function flashUI() {
     setShowUI(true)
@@ -90,16 +105,19 @@ export default function Reader() {
   }
 
   function handleTap(e: React.MouseEvent) {
+    // スワイプ後のクリックイベントは無視
+    if ((e.nativeEvent as PointerEvent & { _fromSwipe?: boolean })._fromSwipe) return
+
     const x = e.clientX
     const w = window.innerWidth
-    if (x < w * 0.25) {
-      // 左タップ
+    if (x < w * 0.4) {
+      // 左40%タップ
       if (direction === 'ltr') goPrev(); else goNext()
-    } else if (x > w * 0.75) {
-      // 右タップ
+    } else if (x > w * 0.6) {
+      // 右40%タップ
       if (direction === 'ltr') goNext(); else goPrev()
     } else {
-      // 中央タップ: UI表示/非表示
+      // 中央20%タップ: UI表示/非表示
       setShowUI(v => !v)
       if (uiTimerRef.current) clearTimeout(uiTimerRef.current)
     }
@@ -148,12 +166,15 @@ export default function Reader() {
           >設定</button>
         </div>
 
+        {/* タップヒント（左右端） */}
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[40%] h-[60%] flex items-center justify-start pl-3 opacity-0" />
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-[40%] h-[60%] flex items-center justify-end pr-3 opacity-0" />
+
         {/* フッター */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-8 pt-8">
           <div className="h-1 bg-white/20 rounded-full overflow-hidden mb-2">
             <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${progress}%` }} />
           </div>
-          <p className="text-white/60 text-xs text-center">{currentIndex + 1} / {totalVirtual}</p>
         </div>
       </div>
 

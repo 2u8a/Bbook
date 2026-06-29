@@ -3,11 +3,11 @@ import { openDB, type DBSchema } from 'idb'
 export interface BookRecord {
   id: string
   title: string
+  color: string
   data: ArrayBuffer
   totalPages: number
   currentPage: number
   addedAt: number
-  // 幅/高さ比率 > 1.2 なら見開きと判定して保存
   spreadDetected: boolean
 }
 
@@ -48,5 +48,14 @@ export async function updateProgress(id: string, currentPage: number) {
   const book = await store.get('books', id)
   if (!book) return
   book.currentPage = currentPage
+  return store.put('books', book)
+}
+
+export async function updateBookMeta(id: string, title: string, color: string) {
+  const store = (await db)
+  const book = await store.get('books', id)
+  if (!book) return
+  book.title = title
+  book.color = color
   return store.put('books', book)
 }
