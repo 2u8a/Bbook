@@ -1,10 +1,54 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>bbook</title>
+
+    <title>Bbook — 見開きPDFを1ページずつ読める無料ブラウザ本棚</title>
+    <meta name="description" content="KindleやAdobeで読みにくい「見開きPDF」を自動で分割して快適に読める無料Webアプリ。右→左（マンガ・日本語書籍）/ 左→右（洋書・技術書）の読み方向切り替えにも対応。インストール不要、PDFはブラウザに保存されるのでどこにも送信されない。" />
+    <meta name="keywords" content="PDF,見開きPDF,PDFビューア,漫画PDF,電子書籍,見開き分割,PDFリーダー,ブラウザ,無料" />
+    <link rel="canonical" href="https://2u8a.github.io/bbook/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://2u8a.github.io/bbook/" />
+    <meta property="og:site_name" content="Bbook" />
+    <meta property="og:title" content="Bbook — 見開きPDFを1ページずつ読める無料ブラウザ本棚" />
+    <meta property="og:description" content="KindleやAdobeで読みにくい「見開きPDF」を自動で分割して快適に読める無料Webアプリ。右→左（マンガ・日本語書籍）/ 左→右（洋書・技術書）の読み方向切り替えにも対応。" />
+    <meta property="og:locale" content="ja_JP" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Bbook — 見開きPDFを1ページずつ読める無料ブラウザ本棚" />
+    <meta name="twitter:description" content="KindleやAdobeで読みにくい「見開きPDF」を自動で分割して快適に読める無料Webアプリ。右→左（マンガ・日本語書籍）/ 左→右（洋書・技術書）の読み方向切り替えにも対応。" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Bbook",
+      "url": "https://2u8a.github.io/bbook/",
+      "description": "見開きPDFを1ページずつ分割して読めるブラウザ本棚。読み方向（右→左 / 左→右）の切り替えにも対応。",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "JPY"
+      },
+      "featureList": [
+        "見開きPDFの自動分割",
+        "右→左・左→右の読み方向切り替え",
+        "しおり機能（続きから再開）",
+        "PDFはブラウザに保存（外部送信なし）",
+        "インストール不要"
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
