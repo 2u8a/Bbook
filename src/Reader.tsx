@@ -44,10 +44,13 @@ export default function Reader() {
   const renderingRef = useRef(false)
   const totalVirtualRef = useRef(0)
 
+  // issue #3: プリレンダリングキャッシュ
+  const pageCache = useRef<Map<number, ImageBitmap>>(new Map())
+  const preRenderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const { ready, totalVirtual, renderPage } = usePdf(pdfData, splitMode, spreadDetected)
   totalVirtualRef.current = totalVirtual
 
-  // 本を読み込む
   useEffect(() => {
     if (!id) return
     getBook(id).then(book => {
@@ -59,17 +62,67 @@ export default function Reader() {
     })
   }, [id])
 
-  // ページ描画
+  // ページ描画（キャッシュ優先）
   useEffect(() => {
     if (!ready || !canvasRef.current) return
     if (renderingRef.current) return
+
+    const canvas = canvasRef.current
+    const cached = pageCache.current.get(currentIndex)
+
+    if (cached) {
+      // キャッシュヒット: 即座に描画（チラつきなし）
+      canvas.width = cached.width
+      canvas.height = cached.height
+      canvas.style.width = `${Math.round(cached.width / window.devicePixelRatio)}px`
+      canvas.style.height = `${Math.round(cached.height / window.devicePixelRatio)}px`
+      canvas.getContext('2d')!.drawImage(cached, 0, 0)
+      schedulePrerender(currentIndex)
+      return
+    }
+
     renderingRef.current = true
-    renderPage(currentIndex, canvasRef.current).finally(() => {
+    renderPage(currentIndex, canvas).then(async () => {
+      // レンダリング完了後にキャッシュ保存
+      try {
+        const bitmap = await createImageBitmap(canvas)
+        pageCache.current.set(currentIndex, bitmap)
+      } catch { /* ignore */ }
+      schedulePrerender(currentIndex)
+    }).finally(() => {
       renderingRef.current = false
     })
   }, [ready, currentIndex, renderPage])
 
-  // しおり保存
+  // 隣接ページをバックグラウンドでプリレンダリング
+  function schedulePrerender(idx: number) {
+    if (preRenderTimer.current) clearTimeout(preRenderTimer.current)
+    preRenderTimer.current = setTimeout(() => {
+      const container = containerRef.current
+      const w = container?.clientWidth
+      const h = container?.clientHeight
+      if (!w || !h) return
+
+      const total = totalVirtualRef.current
+      const targets = [idx - 1, idx + 1].filter(i => i >= 0 && i < total && !pageCache.current.has(i))
+
+      for (const target of targets) {
+        const offscreen = document.createElement('canvas')
+        renderPage(target, offscreen, w, h).then(async () => {
+          try {
+            const bitmap = await createImageBitmap(offscreen)
+            pageCache.current.set(target, bitmap)
+          } catch { /* ignore */ }
+        })
+      }
+    }, 200)
+  }
+
+  // splitModeが変わったらキャッシュをクリア
+  useEffect(() => {
+    pageCache.current.clear()
+  }, [splitMode, spreadDetected])
+
   useEffect(() => {
     if (!id || !ready) return
     updateProgress(id, currentIndex)
@@ -77,15 +130,14 @@ export default function Reader() {
 
   const goNext = useCallback(() => {
     setCurrentIndex(i => Math.min(i + 1, totalVirtualRef.current - 1))
-    flashUI()
+    // issue #4: ページ遷移ではメニューを出さない
   }, [])
 
   const goPrev = useCallback(() => {
     setCurrentIndex(i => Math.max(i - 1, 0))
-    flashUI()
+    // issue #4: ページ遷移ではメニューを出さない
   }, [])
 
-  // キーボード操作
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'ArrowRight') {
@@ -104,21 +156,23 @@ export default function Reader() {
     uiTimerRef.current = setTimeout(() => setShowUI(false), 3000)
   }
 
-  // タップ処理（useSwipeから呼ばれる）
+  // issue #4: タップはuseSwipeから呼ばれる（二重発火防止）
   const handleTap = useCallback((clientX: number) => {
     const w = window.innerWidth
     if (clientX < w * 0.4) {
-      // 左40%タップ
-      // LTR: 左=前のページ / RTL: 左=次のページ（右綴じ本の進行方向）
       if (direction === 'ltr') goPrev(); else goNext()
     } else if (clientX > w * 0.6) {
-      // 右40%タップ
-      // LTR: 右=次のページ / RTL: 右=前のページ
       if (direction === 'ltr') goNext(); else goPrev()
     } else {
-      // 中央20%: UI表示/非表示
-      setShowUI(v => !v)
-      if (uiTimerRef.current) clearTimeout(uiTimerRef.current)
+      // 中央タップのみメニュー表示切替
+      setShowUI(v => {
+        if (!v) flashUI()
+        else {
+          if (uiTimerRef.current) clearTimeout(uiTimerRef.current)
+          return false
+        }
+        return v
+      })
     }
   }, [direction, goNext, goPrev])
 
@@ -129,42 +183,29 @@ export default function Reader() {
   }
 
   function handleSeek(e: React.ChangeEvent<HTMLInputElement>) {
-    // RTLのとき input は scaleX(-1) されているので値を反転する
-    const raw = Number(e.target.value)
-    const idx = direction === 'rtl' ? (totalVirtual - 1 - raw) : raw
-    setCurrentIndex(idx)
-    flashUI()
+    // issue #2: scaleX(-1)済みなのでvalue変換不要、rawのまま使う
+    setCurrentIndex(Number(e.target.value))
   }
 
-  // useSwipe に onTap を渡してクリックイベントの二重発火を防ぐ
   useSwipe(containerRef.current, goNext, goPrev, direction, handleTap)
 
   const progress = totalVirtual > 1 ? (currentIndex / (totalVirtual - 1)) * 100 : 0
   const progressPct = Math.round(progress)
-
-  // シークバーの表示値: RTLは反転
-  const sliderValue = direction === 'rtl' ? (totalVirtual - 1 - currentIndex) : currentIndex
-  const sliderMax = Math.max(0, totalVirtual - 1)
 
   return (
     <div
       ref={containerRef}
       className="w-full h-dvh bg-black flex flex-col items-center justify-center overflow-hidden select-none"
     >
-      {/* Canvas */}
-      <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" />
+      <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" style={{ visibility: ready ? 'visible' : 'hidden' }} />
 
-      {/* ローディング */}
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center text-stone-500 text-sm">
           読み込み中...
         </div>
       )}
 
-      {/* UI オーバーレイ */}
-      <div
-        className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${showUI ? 'opacity-100' : 'opacity-0'}`}
-      >
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${showUI ? 'opacity-100' : 'opacity-0'}`}>
         {/* ヘッダー */}
         <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent px-4 pt-10 pb-8 flex items-center gap-3 pointer-events-auto">
           <button
@@ -195,15 +236,16 @@ export default function Reader() {
             )}
           </div>
 
-          {/* シークスライダー（RTLは見た目を反転） */}
+          {/* issue #2: RTLは scaleX(-1) で反転。value は currentIndex のままで正しい */}
           <div
             style={{ transform: direction === 'rtl' ? 'scaleX(-1)' : 'none' }}
+            onClick={e => e.stopPropagation()}
           >
             <input
               type="range"
               min={0}
-              max={sliderMax}
-              value={sliderValue}
+              max={Math.max(0, totalVirtual - 1)}
+              value={currentIndex}
               onChange={handleSeek}
               className="w-full cursor-pointer appearance-none h-1 rounded-full outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-400 [&::-webkit-slider-thumb]:cursor-pointer"
               style={{
@@ -214,16 +256,12 @@ export default function Reader() {
         </div>
       </div>
 
-      {/* 設定パネル */}
       {showSettings && (
         <div
           className="absolute inset-0 bg-black/60 flex items-end pointer-events-auto"
           onClick={() => setShowSettings(false)}
         >
-          <div
-            className="w-full bg-stone-900 rounded-t-2xl p-6 flex flex-col gap-5"
-            onClick={e => e.stopPropagation()}
-          >
+          <div className="w-full bg-stone-900 rounded-t-2xl p-6 flex flex-col gap-5" onClick={e => e.stopPropagation()}>
             <h2 className="text-white font-semibold text-lg">表示設定</h2>
 
             <div>
@@ -263,10 +301,9 @@ export default function Reader() {
               </div>
             )}
 
-            <button
-              className="mt-2 py-3 rounded-xl bg-stone-800 text-white text-sm"
-              onClick={() => setShowSettings(false)}
-            >閉じる</button>
+            <button className="mt-2 py-3 rounded-xl bg-stone-800 text-white text-sm" onClick={() => setShowSettings(false)}>
+              閉じる
+            </button>
           </div>
         </div>
       )}
