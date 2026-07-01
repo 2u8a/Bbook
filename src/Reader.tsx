@@ -33,7 +33,6 @@ export default function Reader() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showUI, setShowUI] = useState(true)
   const [showSettings, setShowSettings] = useState(false)
-  const [debug, setDebug] = useState('')
 
   const initSettings = loadSettings()
   const [direction, setDirection] = useState<ReadingDirection>(initSettings.direction ?? 'ltr')
@@ -87,15 +86,6 @@ export default function Reader() {
 
     renderingRef.current = true
     renderPage(currentIndex, canvas).then(async () => {
-      // --- DEBUG: 描画後の実測値を画面に出す ---
-      const p = canvas.parentElement
-      let sample = '?'
-      try {
-        const g = canvas.getContext('2d')!
-        const d = g.getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data
-        sample = `${d[0]},${d[1]},${d[2]},${d[3]}`
-      } catch (e) { sample = 'err:' + (e as Error).message }
-      setDebug(`dpr=${window.devicePixelRatio} cv=${canvas.width}x${canvas.height} css=${canvas.style.width}x${canvas.style.height} cont=${p?.clientWidth}x${p?.clientHeight} px=${sample}`)
       // レンダリング完了後にキャッシュ保存
       try {
         const bitmap = await createImageBitmap(canvas)
@@ -103,8 +93,6 @@ export default function Reader() {
         cssCache.current.set(currentIndex, { w: canvas.style.width, h: canvas.style.height })
       } catch { /* ignore */ }
       schedulePrerender(currentIndex)
-    }).catch((e) => {
-      setDebug('RENDER ERROR: ' + (e as Error).message)
     }).finally(() => {
       renderingRef.current = false
     })
@@ -216,12 +204,6 @@ export default function Reader() {
       className="w-full h-dvh bg-black flex flex-col items-center justify-center overflow-hidden select-none"
     >
       <canvas ref={canvasRef} className="max-w-full max-h-full object-contain" style={{ visibility: ready ? 'visible' : 'hidden' }} />
-
-      {debug && (
-        <div className="absolute top-20 left-2 right-2 z-50 bg-red-900/90 text-white text-[10px] leading-tight p-2 rounded break-all pointer-events-none">
-          {debug}
-        </div>
-      )}
 
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center text-stone-500 text-sm">
