@@ -46,6 +46,8 @@ export default function Reader() {
 
   // issue #3: プリレンダリングキャッシュ
   const pageCache = useRef<Map<number, ImageBitmap>>(new Map())
+  // 解像度をキャップした場合に備え、表示(CSS)サイズも一緒にキャッシュする
+  const cssCache = useRef<Map<number, { w: string; h: string }>>(new Map())
   const preRenderTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { ready, totalVirtual, renderPage } = usePdf(pdfData, splitMode, spreadDetected)
@@ -74,8 +76,9 @@ export default function Reader() {
       // キャッシュヒット: 即座に描画（チラつきなし）
       canvas.width = cached.width
       canvas.height = cached.height
-      canvas.style.width = `${Math.round(cached.width / window.devicePixelRatio)}px`
-      canvas.style.height = `${Math.round(cached.height / window.devicePixelRatio)}px`
+      const css = cssCache.current.get(currentIndex)
+      canvas.style.width = css ? css.w : `${Math.round(cached.width / window.devicePixelRatio)}px`
+      canvas.style.height = css ? css.h : `${Math.round(cached.height / window.devicePixelRatio)}px`
       canvas.getContext('2d')!.drawImage(cached, 0, 0)
       schedulePrerender(currentIndex)
       return
@@ -87,6 +90,7 @@ export default function Reader() {
       try {
         const bitmap = await createImageBitmap(canvas)
         pageCache.current.set(currentIndex, bitmap)
+        cssCache.current.set(currentIndex, { w: canvas.style.width, h: canvas.style.height })
       } catch { /* ignore */ }
       schedulePrerender(currentIndex)
     }).finally(() => {
@@ -112,6 +116,7 @@ export default function Reader() {
           try {
             const bitmap = await createImageBitmap(offscreen)
             pageCache.current.set(target, bitmap)
+            cssCache.current.set(target, { w: offscreen.style.width, h: offscreen.style.height })
           } catch { /* ignore */ }
         })
       }
@@ -121,6 +126,7 @@ export default function Reader() {
   // splitModeが変わったらキャッシュをクリア
   useEffect(() => {
     pageCache.current.clear()
+    cssCache.current.clear()
   }, [splitMode, spreadDetected])
 
   useEffect(() => {
