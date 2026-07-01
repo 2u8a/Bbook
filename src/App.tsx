@@ -4,7 +4,7 @@ import Reader from './Reader'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/" element={<Bookshelf />} />
         <Route path="/read/:id" element={<Reader />} />
