@@ -25,6 +25,18 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
+    <!-- GitHub Pages SPA: restore path from redirect -->
+    <script>
+      (function() {
+        var p = window.location.search.match(/[?&]p=([^&]*)/);
+        if (p) {
+          window.history.replaceState(null, null,
+            '/' + decodeURIComponent(p[1]) + window.location.hash
+          );
+        }
+      })();
+    </script>
+
     <!-- Structured Data -->
     <script type="application/ld+json">
     {
