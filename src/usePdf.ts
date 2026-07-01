@@ -11,14 +11,26 @@ export interface PageInfo {
   half: 'left' | 'right' | null
 }
 
-function buildPageList(totalPages: number, splitMode: SplitMode, spreadDetected: boolean): PageInfo[] {
+async function buildPageList(
+  doc: pdfjsLib.PDFDocumentProxy,
+  splitMode: SplitMode,
+  spreadDetected: boolean,
+): Promise<PageInfo[]> {
+  const totalPages = doc.numPages
   const split = spreadDetected && splitMode !== 'none'
   if (!split) {
     return Array.from({ length: totalPages }, (_, i) => ({ pdfPage: i + 1, half: null }))
   }
   const pages: PageInfo[] = []
   for (let p = 1; p <= totalPages; p++) {
-    if (splitMode === 'right-first') {
+    // ページごとに実寸を確認し、横長(見開き)ページだけを分割する。
+    // 縦長の表紙や単ページはそのまま1ページとして扱う。
+    const page = await doc.getPage(p)
+    const vp = page.getViewport({ scale: 1 })
+    const isWide = vp.width / vp.height > 1.2
+    if (!isWide) {
+      pages.push({ pdfPage: p, half: null })
+    } else if (splitMode === 'right-first') {
       pages.push({ pdfPage: p, half: 'right' })
       pages.push({ pdfPage: p, half: 'left' })
     } else {
@@ -43,7 +55,8 @@ export function usePdf(data: ArrayBuffer | null, splitMode: SplitMode, spreadDet
       const doc = await pdfjsLib.getDocument({ data: data.slice(0) }).promise
       if (cancelled) return
       docRef.current = doc
-      const list = buildPageList(doc.numPages, splitMode, spreadDetected)
+      const list = await buildPageList(doc, splitMode, spreadDetected)
+      if (cancelled) return
       pageListRef.current = list
       setTotalVirtual(list.length)
       setReady(true)

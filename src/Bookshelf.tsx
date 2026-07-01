@@ -18,9 +18,15 @@ function randomColor() {
 
 async function detectSpread(data: ArrayBuffer): Promise<boolean> {
   const doc = await pdfjsLib.getDocument({ data: data.slice(0) }).promise
-  const page = await doc.getPage(1)
-  const vp = page.getViewport({ scale: 1 })
-  return vp.width / vp.height > 1.2
+  // 1ページ目が縦長の表紙で2ページ目以降が見開き、というケースがあるため
+  // 先頭の数ページをサンプリングし、1枚でも横長なら見開きPDFと判定する
+  const sample = Math.min(doc.numPages, 5)
+  for (let i = 1; i <= sample; i++) {
+    const page = await doc.getPage(i)
+    const vp = page.getViewport({ scale: 1 })
+    if (vp.width / vp.height > 1.2) return true
+  }
+  return false
 }
 
 async function getTotalPages(data: ArrayBuffer): Promise<number> {
